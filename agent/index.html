@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Termux File Agent</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2d; --line:#26334c; --muted:#9ba9c2; --text:#edf3ff; --accent:#8b9cff; --accent2:#57d6bb; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(ellipse at 12% 0%,#1b2850 0,transparent 38%),var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    .shell { max-width:1100px; margin:auto; padding:42px 22px 64px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:30px; }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .logo { display:grid; place-items:center; width:48px; height:48px; border:1px solid #5364a1; border-radius:15px; background:#202c50; font-size:24px; }
+    h1 { margin:0; font-size:clamp(22px,4vw,32px); letter-spacing:-.04em; }
+    .subtitle,.muted { color:var(--muted); }
+    .badge { padding:7px 11px; border:1px solid #285a54; border-radius:999px; color:#8ce4d0; background:#102b2b; font-size:12px; white-space:nowrap; }
+    .grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(260px,.7fr); gap:18px; }
+    .card { border:1px solid var(--line); background:linear-gradient(145deg,rgba(20,29,49,.97),rgba(15,22,39,.97)); border-radius:18px; padding:22px; box-shadow:0 16px 40px #0002; }
+    .card h2 { margin:0 0 6px; font-size:18px; }
+    .search { display:flex; gap:10px; margin-top:20px; }
+    input { min-width:0; flex:1; padding:13px 15px; color:var(--text); background:#0b1222; border:1px solid #34415d; border-radius:11px; outline:none; }
+    input:focus { border-color:var(--accent); box-shadow:0 0 0 3px #8b9cff22; }
+    button { cursor:pointer; padding:12px 17px; color:#10162b; background:var(--accent); border:0; border-radius:11px; font-weight:700; }
+    button:hover { filter:brightness(1.08); }
+    button:disabled { opacity:.55; cursor:wait; }
+    .results { display:grid; gap:8px; max-height:430px; overflow:auto; margin-top:18px; }
+    .file { width:100%; text-align:left; color:var(--text); background:#0d1527; border:1px solid #26334c; padding:12px 14px; border-radius:10px; overflow-wrap:anywhere; font-weight:500; }
+    .file:hover { border-color:#7587de; background:#151f38; }
+    .preview { margin-top:16px; }
+    pre { max-height:480px; overflow:auto; padding:16px; white-space:pre-wrap; overflow-wrap:anywhere; color:#d5e0f5; background:#080d18; border:1px solid var(--line); border-radius:12px; font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .notice { margin-top:18px; padding:13px 14px; border-radius:11px; color:#d7e2ff; background:#202945; border:1px solid #34446d; font-size:13px; }
+    .feature { padding:14px 0; border-bottom:1px solid var(--line); }
+    .feature:last-child { border:0; padding-bottom:0; }
+    .feature strong { display:block; margin-bottom:3px; }
+    .status { min-height:24px; margin-top:10px; color:var(--muted); font-size:13px; }
+    .empty { color:var(--muted); padding:12px 2px; }
+    code { color:#b8c5ff; background:#0b1222; padding:2px 5px; border-radius:5px; }
+    @media(max-width:760px) { .shell{padding-top:25px}.grid{grid-template-columns:1fr}header{align-items:flex-start}.badge{font-size:11px}.search{flex-direction:column}button{width:100%} }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><div class="logo" aria-hidden="true">⌘</div><div><h1>Termux File Agent</h1><div class="subtitle">Your local files, easier to explore.</div></div></div>
+      <span class="badge">● Local · read-only web mode</span>
+    </header>
+    <div class="grid">
+      <section class="card" aria-labelledby="search-title">
+        <h2 id="search-title">Search your files</h2>
+        <div class="muted">Search filenames first, then supported text-file contents.</div>
+        <form class="search" id="search-form"><input id="query" type="search" placeholder="Try a filename or keyword…" autocomplete="off" required><button id="search-button" type="submit">Search files</button></form>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+        <div class="results" id="results"></div>
+        <section class="preview" id="preview" hidden><h2 id="preview-title">Preview</h2><pre id="preview-content"></pre><div class="muted" id="preview-note"></div></section>
+        <div class="notice">The browser interface only searches and previews. File editing, script execution, AI chat, database commands, and Git commits remain in the original terminal agent.</div>
+      </section>
+      <aside class="card">
+        <h2>Agent capabilities</h2>
+        <div class="feature"><strong>Search & preview</strong><span class="muted">Browse matching local files here.</span></div>
+        <div class="feature"><strong>AI tools in terminal</strong><span class="muted">Gemini, Groq, or OpenRouter, with persistent project sessions.</span></div>
+        <div class="feature"><strong>File actions in terminal</strong><span class="muted">Edit and execute files, inspect SQLite, map directories, web search, and Git commits.</span></div>
+        <div class="feature"><strong>Private by default</strong><span class="muted">The web server binds to this device only at <code>127.0.0.1</code>.</span></div>
+        <div class="notice"><strong>Start in Termux</strong><br>From the repository folder run:<br><code>python agent/web.py</code><br>Then open <code>http://127.0.0.1:8765</code> in your browser. Stop with Ctrl+C.</div>
+        <p class="muted" style="font-size:13px;margin:17px 0 0">For the unchanged terminal workflow, run <code>python agent/new1.py</code>.</p>
+      </aside>
+    </div>
+  </main>
+<script>
+  const form = document.getElementById('search-form');
+  const query = document.getElementById('query');
+  const results = document.getElementById('results');
+  const status = document.getElementById('status');
+  const preview = document.getElementById('preview');
+  const button = document.getElementById('search-button');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    results.replaceChildren(); preview.hidden = true; button.disabled = true;
+    status.textContent = 'Searching…';
+    try {
+      const response = await fetch('/api/search?q=' + encodeURIComponent(query.value.trim()));
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Search failed');
+      status.textContent = `${data.results.length} result${data.results.length === 1 ? '' : 's'} found`;
+      if (!data.results.length) { results.textContent = 'No files found.'; results.className = 'results empty'; return; }
+      results.className = 'results';
+      data.results.forEach((path) => {
+        const item = document.createElement('button');
+        item.type = 'button'; item.className = 'file'; item.textContent = path;
+        item.addEventListener('click', () => showPreview(path));
+        results.append(item);
+      });
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+
+  async function showPreview(path) {
+    preview.hidden = false;
+    document.getElementById('preview-title').textContent = path;
+    document.getElementById('preview-content').textContent = 'Loading preview…';
+    document.getElementById('preview-note').textContent = '';
+    try {
+      const response = await fetch('/api/read?path=' + encodeURIComponent(path));
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Preview failed');
+      document.getElementById('preview-content').textContent = data.content;
+      document.getElementById('preview-note').textContent = data.truncated ? 'Preview limited to 30,000 characters.' : '';
+    } catch (error) { document.getElementById('preview-content').textContent = error.message; }
+  }
+</script>
+</body>
+</html>
